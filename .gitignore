@@ -1,0 +1,9 @@
+#Gradle
+.gradle/
+build/
+out/
+
+#IntelliJ IDEA
+.idea/
+*.iml
+.attach_pid*
