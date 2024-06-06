@@ -226,6 +226,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         dependsOnIfPresent(tasks, "lintVitalAnalyze" + capitalizedName, scalaTask);
         dependsOnIfPresent(tasks, "bundle" + capitalizedName + "ClassesToCompileJar", scalaTask);
         dependsOnIfPresent(tasks, "generate" + capitalizedName + "LintVitalReportModel", scalaTask);
+        dependsOnIfPresent(tasks, "expand" + capitalizedName + "ArtProfileWildcards", scalaTask);
     }
 
 }

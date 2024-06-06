@@ -4,7 +4,7 @@ Tested on [a popular Android App](https://play.google.com/store/apps/details?id=
 
 ## Supported versions
 
-* Scala 2.13.8 or above
+* Scala 2.13.7 or above
 * Scala 2.11.12
 * Gradle 8.2.x or above
 * Android Plugin 8.2.x or above
@@ -17,7 +17,7 @@ Tested on [a popular Android App](https://play.google.com/store/apps/details?id=
 ```kotlin
 buildscript {
     dependencies {
-        classpath("com.soundcorset:scala-android-plugin:24.0606.2018")
+        classpath("com.soundcorset:scala-android-plugin:24.0606.2139")
         // ...
     }
 }
@@ -35,6 +35,10 @@ dependencies {
     implementation("org.scala-lang:scala-library:2.13.13")
 }
 ```
+
+## Example project
+
+https://github.com/onsqcorp/hello-scala-android
 
 ## Build from the source and apply it to your project
 
