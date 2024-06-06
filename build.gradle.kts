@@ -8,6 +8,7 @@ plugins {
     groovy
     `maven-publish`
     signing
+    id("com.gradleup.nmcp").version("0.0.8")
 }
 
 repositories {
@@ -75,4 +76,29 @@ publishing {
             }
         }
     }
+}
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+nmcp {
+    publishAllProjectsProbablyBreakingProjectIsolation {
+        // Add properties below in ~/.gradle/gradle.properties
+        // centralSonatypeUsername=xxx
+        // centralSonatypePassword=xxx
+        username = project.property("centralSonatypeUsername").toString()
+        password = project.property("centralSonatypePassword").toString()
+        publicationType = "USER_MANAGED"
+    }
+}
+
+signing {
+    // Add properties below in ~/.gradle/gradle.properties
+    // signing.keyId=xxx
+    // signing.password=xxx
+    // signing.secretKeyRingFile=xxx
+    useGpgCmd()
+    sign(publishing.publications["mavenJava"])
 }
