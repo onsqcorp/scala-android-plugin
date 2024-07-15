@@ -37,12 +37,9 @@ import java.util.stream.Collectors;
 public class ScalaAndroidPlugin extends ScalaBasePlugin {
     private static final Logger LOGGER = LoggerFactory.getLogger(ScalaAndroidPlugin.class);
 
-    private final ObjectFactory objectFactory;
-
     @Inject
     public ScalaAndroidPlugin(ObjectFactory objectFactory, JvmPluginServices jvmPluginServices) {
         super(objectFactory, jvmPluginServices);
-        this.objectFactory = objectFactory;
     }
 
     public void apply(Project project) {
@@ -63,7 +60,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
                 }
 
                 sourceSet.getJava().srcDir(sourceSetPath);
-                var scalaSourceSet = new DefaultScalaSourceSet(sourceSetName, objectFactory) {};
+                var scalaSourceSet = new DefaultScalaSourceSet(sourceSetName, project.getObjects()) {};
                 var scalaDirectorySet = scalaSourceSet.getScala();
                 scalaDirectorySet.srcDir(sourceSetPath);
                 ext.add(ScalaSourceDirectorySet.class, "ScalaSourceDirectorySet", scalaDirectorySet);
