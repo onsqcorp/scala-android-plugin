@@ -1,7 +1,7 @@
 import java.util.Date
 import java.text.SimpleDateFormat
 
-val androidVersion = "8.3.2"
+val androidVersion = "8.5.0"
 
 plugins {
     `java-gradle-plugin`
@@ -27,8 +27,8 @@ version = ver
 println("groupId: $grp, version: $ver")
 
 dependencies {
-    implementation("com.android.tools.build:gradle:$androidVersion")
-    implementation("org.jetbrains.kotlin.android:org.jetbrains.kotlin.android.gradle.plugin:2.0.0")
+    compileOnly("com.android.tools.build:gradle:$androidVersion")
+    compileOnly("org.jetbrains.kotlin.android:org.jetbrains.kotlin.android.gradle.plugin:2.0.0")
 }
 
 gradlePlugin {

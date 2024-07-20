@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Inject;
 import java.io.File;
 import java.util.*;
-import java.util.stream.Collectors;
 
 
 public class ScalaAndroidPlugin extends ScalaBasePlugin {
@@ -60,6 +59,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
                 }
 
                 sourceSet.getJava().srcDir(sourceSetPath);
+                @SuppressWarnings("deprecation")
                 var scalaSourceSet = new DefaultScalaSourceSet(sourceSetName, project.getObjects()) {};
                 var scalaDirectorySet = scalaSourceSet.getScala();
                 scalaDirectorySet.srcDir(sourceSetPath);
@@ -108,6 +108,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         }
     }
 
+    @SuppressWarnings("deprecation")
     private static Collection<? extends BaseVariant> listVariants(BaseExtension androidExtension) {
         if (androidExtension instanceof AppExtension) {
             return ((AppExtension) androidExtension).getApplicationVariants();
@@ -126,6 +127,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         throw new RuntimeException("There is no android extension");
     }
 
+    @SuppressWarnings("deprecation")
     private static void processVariant(
             BaseVariant variant,
             Project project,
@@ -142,11 +144,13 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         var javaClasspath = javaTask.getClasspath();
         var taskName = javaTask.getName().replace("Java", "Scala");
         var scalaTask = tasks.create(taskName, ScalaCompile.class);
-        var scalaOutDir = project.getLayout().getBuildDirectory().dir("tmp/scala/" + scalaTask.getName()+"/classes");
+        var scalaOutDir = project.getLayout().getBuildDirectory().dir("tmp/scala-classes/" + variantName);
         scalaTask.getDestinationDirectory().set(scalaOutDir);
-        scalaTask.setClasspath(javaClasspath);
         scalaTask.setScalaClasspath(scalaRuntime.inferScalaClasspath(javaClasspath));
-        variant.registerPreJavacGeneratedBytecode(project.files(scalaOutDir));
+        var preJavaClasspathKey = variant.registerPreJavacGeneratedBytecode(project.files(scalaOutDir));
+        var scalaClasspath = project.getObjects().fileCollection().from(javaClasspath).from(variant.getCompileClasspath(preJavaClasspathKey))
+                .from(androidExtension.getBootClasspath().toArray());
+        scalaTask.setClasspath(scalaClasspath);
         for(Object t: javaTask.getDependsOn()) {
             scalaTask.dependsOn(t);
         }
@@ -159,7 +163,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         scalaTask.setZincClasspath(zinc.getAsFileTree());
 
         LOGGER.debug("scala sources for {}: {}", variantName, scalaTask.getSource().getFiles());
-
+        @SuppressWarnings("deprecation")
         Object[] additionalSourceFiles = variant.getSourceFolders(SourceKind.JAVA)
                 .stream()
                 .map(ConfigurableFileTree::getDir)
@@ -173,12 +177,13 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
                 var ext = ((ExtensionAware) provider).getExtensions();
                 try {
                     SourceDirectorySet srcDirSet = ext.getByType(ScalaSourceDirectorySet.class);
-                    scalaTask.setSource(srcDirSet.plus(additionalSrc));
+                    additionalSrc.from(srcDirSet);
                 } catch(UnknownDomainObjectException u) {
                     // pass through
                 }
             }
         });
+        scalaTask.setSource(additionalSrc);
         javaTask.setSource(project.getObjects().fileCollection()); // set empty source
 
         if (scalaTask.getSource().isEmpty()) {
@@ -188,39 +193,22 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         }
 
         scalaTask.doFirst(task -> {
-            var runtimeJars =
-                project.getLayout().files(androidExtension.getBootClasspath().toArray())
-                    .plus(javaTask.getClasspath());
-
-            scalaTask.setClasspath(runtimeJars);
             scalaTask.getOptions().setAnnotationProcessorPath(javaTask.getOptions().getAnnotationProcessorPath());
-
             var incrementalOptions = scalaTask.getScalaCompileOptions().getIncrementalOptions();
             incrementalOptions.getAnalysisFile().set(
                 project.getLayout().getBuildDirectory().file("tmp/scala/compilerAnalysis/" + scalaTask.getName() + ".analysis")
             );
-
             incrementalOptions.getClassfileBackupDir().set(
                 project.getLayout().getBuildDirectory().file("tmp/scala/classfileBackup/" + scalaTask.getName() + ".bak")
             );
-
             LOGGER.debug("Java annotationProcessorPath {}", javaTask.getOptions().getAnnotationProcessorPath());
             LOGGER.debug("Scala compiler args {}", scalaTask.getOptions().getCompilerArgs());
         });
         LOGGER.debug("Scala classpath: {}", scalaTask.getClasspath());
 
         javaTask.dependsOn(scalaTask);
-
-        // Prevent error from implicit dependency (AGP 8.0 or above)
-        // https://docs.gradle.org/8.1.1/userguide/validation_problems.html#implicit_dependency
         String capitalizedName = variantName.substring(0,1).toUpperCase() + variantName.substring(1);
-        dependsOnIfPresent(tasks, "process" + capitalizedName + "JavaRes", scalaTask);
-        dependsOnIfPresent(tasks, "dexBuilder" + capitalizedName, scalaTask);
-        dependsOnIfPresent(tasks, "transform" + capitalizedName + "ClassesWithAsm", scalaTask);
-        dependsOnIfPresent(tasks, "lintVitalAnalyze" + capitalizedName, scalaTask);
-        dependsOnIfPresent(tasks, "bundle" + capitalizedName + "ClassesToCompileJar", scalaTask);
-        dependsOnIfPresent(tasks, "generate" + capitalizedName + "LintVitalReportModel", scalaTask);
-        dependsOnIfPresent(tasks, "expand" + capitalizedName + "ArtProfileWildcards", scalaTask);
+        scalaTask.dependsOn(tasks.findByName("generate" + capitalizedName + "BuildConfig"));
     }
 
 }
