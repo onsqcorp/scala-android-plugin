@@ -133,22 +133,23 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
             BaseExtension androidExtension
     ) {
         var variantName = variant.getName();
-        LOGGER.debug("Processing variant {}", variantName);
-
         var javaTask = variant.getJavaCompileProvider().getOrNull();
         if (javaTask == null) {
-            LOGGER.info("No java compile provider for {}", variantName);
+            LOGGER.warn("No java compile provider for {}", variantName);
             return;
         }
-
         TaskContainer tasks = project.getTasks();
+        var javaClasspath = javaTask.getClasspath();
         var taskName = javaTask.getName().replace("Java", "Scala");
         var scalaTask = tasks.create(taskName, ScalaCompile.class);
-
-        scalaTask.getDestinationDirectory().set(javaTask.getDestinationDirectory());
-        scalaTask.setClasspath(javaTask.getClasspath());
-        scalaTask.dependsOn(javaTask.getDependsOn());
-        scalaTask.setScalaClasspath(scalaRuntime.inferScalaClasspath(javaTask.getClasspath()));
+        var scalaOutDir = project.getLayout().getBuildDirectory().dir("tmp/scala/" + scalaTask.getName()+"/classes");
+        scalaTask.getDestinationDirectory().set(scalaOutDir);
+        scalaTask.setClasspath(javaClasspath);
+        scalaTask.setScalaClasspath(scalaRuntime.inferScalaClasspath(javaClasspath));
+        variant.registerPreJavacGeneratedBytecode(project.files(scalaOutDir));
+        for(Object t: javaTask.getDependsOn()) {
+            scalaTask.dependsOn(t);
+        }
         scalaTask.getScalaCompileOptions().getKeepAliveMode().set(KeepAliveMode.SESSION);
 
         var zinc = project.getConfigurations().getByName("zinc");
@@ -173,19 +174,15 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
                 try {
                     SourceDirectorySet srcDirSet = ext.getByType(ScalaSourceDirectorySet.class);
                     scalaTask.setSource(srcDirSet.plus(additionalSrc));
-
-                    var scalaFiles = srcDirSet.getFiles().stream()
-                            .map(File::getAbsolutePath)
-                            .collect(Collectors.toSet());
-                    javaTask.exclude(scalaFiles);
                 } catch(UnknownDomainObjectException u) {
                     // pass through
                 }
             }
         });
+        javaTask.setSource(project.getObjects().fileCollection()); // set empty source
 
         if (scalaTask.getSource().isEmpty()) {
-            LOGGER.debug("no scala sources found for {} removing scala task", variantName);
+            LOGGER.warn("no scala sources found for {} removing scala task", variantName);
             scalaTask.setEnabled(false);
             return;
         }
@@ -212,7 +209,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         });
         LOGGER.debug("Scala classpath: {}", scalaTask.getClasspath());
 
-        javaTask.finalizedBy(scalaTask);
+        javaTask.dependsOn(scalaTask);
 
         // Prevent error from implicit dependency (AGP 8.0 or above)
         // https://docs.gradle.org/8.1.1/userguide/validation_problems.html#implicit_dependency
