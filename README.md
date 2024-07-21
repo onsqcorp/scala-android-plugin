@@ -42,9 +42,9 @@ https://github.com/onsqcorp/hello-scala-android
 
 ## Build from the source and apply it to your project
 
- * Checkout this repository
+ * Clone this repository
  * Run `publishToMavenLocal` gradle command
- * In the console log, the artifact name `com.soundcorset:scala-android-plugin:yy.MMdd.HHmm` will be displayed (version changed for each time).
+ * In the console, the artifact name `com.soundcorset:scala-android-plugin:yy.MMdd.HHmm` will be displayed (version changed for each time).
  * Set it in your project's `build.gradle.kts`. 
 ```kotlin
 buildscript {

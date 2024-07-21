@@ -1,6 +1,7 @@
 package com.soundcorset.scala.android.plugin;
 
 import com.android.build.gradle.*;
+import com.android.build.gradle.api.AndroidSourceDirectorySet;
 import com.android.build.gradle.api.BaseVariant;
 import com.android.build.gradle.api.SourceKind;
 import com.android.build.gradle.internal.plugins.BasePlugin;
@@ -45,27 +46,15 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         super.apply(project);
         ScalaRuntime scalaRuntime = project.getExtensions().getByType(ScalaRuntime.class);
         ensureAndroidPlugin(project.getPlugins());
-
         var androidExt = (BaseExtension) project.getExtensions().getByName("android");
+        // The function `all()` take account all the future additions for the source sets
         androidExt.getSourceSets().all(sourceSet -> {
-            if (sourceSet instanceof ExtensionAware) {
-                var ext = ((ExtensionAware) sourceSet).getExtensions();
-                String sourceSetName = sourceSet.getName();
-                File sourceSetPath = project.file("src/" + sourceSetName + "/scala");
-
-                if (!sourceSetPath.exists()) {
-                    LOGGER.debug("SourceSet path does not exists for {} {}", sourceSet.getName(), sourceSetPath);
-                    return;
-                }
-
+            String sourceSetName = sourceSet.getName();
+            File sourceSetPath = project.file("src/" + sourceSetName + "/scala");
+            if (sourceSetPath.exists()) {
                 sourceSet.getJava().srcDir(sourceSetPath);
-                @SuppressWarnings("deprecation")
-                var scalaSourceSet = new DefaultScalaSourceSet(sourceSetName, project.getObjects()) {};
-                var scalaDirectorySet = scalaSourceSet.getScala();
-                scalaDirectorySet.srcDir(sourceSetPath);
-                ext.add(ScalaSourceDirectorySet.class, "ScalaSourceDirectorySet", scalaDirectorySet);
-
-                LOGGER.debug("Created scala sourceDirectorySet at {}", scalaDirectorySet.getSrcDirs());
+            } else {
+                LOGGER.debug("SourceSet path does not exists for {} {}", sourceSet.getName(), sourceSetPath);
             }
         });
 
@@ -78,9 +67,9 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
             throw new GradleException("If jetifier is enabled, \"android.jetifier.ignorelist=scala\" should be defined in gradle.properties.");
         }
 
-        project.afterEvaluate(p -> {
-            listVariants(androidExt).forEach(variant -> processVariant(variant, project, scalaRuntime, androidExt));
-            TaskContainer tasks = project.getTasks();
+        project.afterEvaluate(proj -> {
+            listVariants(androidExt).forEach(variant -> processVariant(variant, proj, scalaRuntime, androidExt));
+            TaskContainer tasks = proj.getTasks();
             dependsOnIfPresent(tasks, "compileDebugUnitTestScalaWithScalac", "compileDebugScalaWithScalac");
             dependsOnIfPresent(tasks, "compileReleaseUnitTestScalaWithScalac", "compileReleaseScalaWithScalac");
         });
@@ -169,20 +158,15 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
                 .map(ConfigurableFileTree::getDir)
                 .toArray();
         ConfigurableFileCollection additionalSrc = project.files(additionalSourceFiles);
-
         LOGGER.debug("additional source files found at {}", additionalSourceFiles);
 
-        variant.getSourceSets().forEach(provider -> {
-            if(provider instanceof ExtensionAware) {
-                var ext = ((ExtensionAware) provider).getExtensions();
-                try {
-                    SourceDirectorySet srcDirSet = ext.getByType(ScalaSourceDirectorySet.class);
-                    additionalSrc.from(srcDirSet);
-                } catch(UnknownDomainObjectException u) {
-                    // pass through
+        variant.getSourceSets().forEach(provider ->
+            provider.getJavaDirectories().forEach(dir -> {
+                if(dir.exists()) {
+                    additionalSrc.from(dir);
                 }
-            }
-        });
+            })
+        );
         scalaTask.setSource(additionalSrc);
         javaTask.setSource(project.getObjects().fileCollection()); // set empty source
 
