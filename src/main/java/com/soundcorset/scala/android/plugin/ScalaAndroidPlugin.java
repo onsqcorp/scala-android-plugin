@@ -1,7 +1,6 @@
 package com.soundcorset.scala.android.plugin;
 
 import com.android.build.gradle.*;
-import com.android.build.gradle.api.AndroidSourceDirectorySet;
 import com.android.build.gradle.api.BaseVariant;
 import com.android.build.gradle.api.SourceKind;
 import com.android.build.gradle.internal.plugins.BasePlugin;
@@ -12,17 +11,12 @@ import com.android.build.gradle.options.ProjectOptions;
 import com.android.build.gradle.options.StringOption;
 import org.gradle.api.*;
 import org.gradle.api.file.ConfigurableFileCollection;
-import org.gradle.api.file.ConfigurableFileTree;
-import org.gradle.api.file.SourceDirectorySet;
-import org.gradle.api.internal.tasks.DefaultScalaSourceSet;
 import org.gradle.api.model.ObjectFactory;
-import org.gradle.api.plugins.ExtensionAware;
 import org.gradle.api.plugins.PluginContainer;
 import org.gradle.api.plugins.jvm.internal.JvmPluginServices;
 import org.gradle.api.plugins.scala.ScalaBasePlugin;
 import org.gradle.api.services.BuildServiceRegistry;
 import org.gradle.api.tasks.ScalaRuntime;
-import org.gradle.api.tasks.ScalaSourceDirectorySet;
 import org.gradle.api.tasks.TaskContainer;
 import org.gradle.api.tasks.scala.ScalaCompile;
 import org.gradle.language.scala.tasks.KeepAliveMode;
@@ -144,22 +138,12 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
             scalaTask.dependsOn(t);
         }
         scalaTask.getScalaCompileOptions().getKeepAliveMode().set(KeepAliveMode.SESSION);
-
         var zinc = project.getConfigurations().getByName("zinc");
         var plugins = project.getConfigurations().getByName(ScalaBasePlugin.SCALA_COMPILER_PLUGINS_CONFIGURATION_NAME);
-
         scalaTask.setScalaCompilerPlugins(plugins.getAsFileTree());
         scalaTask.setZincClasspath(zinc.getAsFileTree());
 
-        LOGGER.debug("scala sources for {}: {}", variantName, scalaTask.getSource().getFiles());
-        @SuppressWarnings("deprecation")
-        Object[] additionalSourceFiles = variant.getSourceFolders(SourceKind.JAVA)
-                .stream()
-                .map(ConfigurableFileTree::getDir)
-                .toArray();
-        ConfigurableFileCollection additionalSrc = project.files(additionalSourceFiles);
-        LOGGER.debug("additional source files found at {}", additionalSourceFiles);
-
+        ConfigurableFileCollection additionalSrc = project.files(variant.getSourceFolders(SourceKind.JAVA));
         variant.getSourceSets().forEach(provider ->
             provider.getJavaDirectories().forEach(dir -> {
                 if(dir.exists()) {
@@ -170,29 +154,26 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         scalaTask.setSource(additionalSrc);
         javaTask.setSource(project.getObjects().fileCollection()); // set empty source
 
-        if (scalaTask.getSource().isEmpty()) {
-            LOGGER.warn("no scala sources found for {} removing scala task", variantName);
-            scalaTask.setEnabled(false);
-            return;
-        }
-
         scalaTask.doFirst(task -> {
+            var buildDir = project.getLayout().getBuildDirectory();
             scalaTask.getOptions().setAnnotationProcessorPath(javaTask.getOptions().getAnnotationProcessorPath());
             var incrementalOptions = scalaTask.getScalaCompileOptions().getIncrementalOptions();
             incrementalOptions.getAnalysisFile().set(
-                project.getLayout().getBuildDirectory().file("tmp/scala/compilerAnalysis/" + scalaTask.getName() + ".analysis")
+                buildDir.file("tmp/scala/compilerAnalysis/" + scalaTask.getName() + ".analysis")
             );
             incrementalOptions.getClassfileBackupDir().set(
-                project.getLayout().getBuildDirectory().file("tmp/scala/classfileBackup/" + scalaTask.getName() + ".bak")
+                buildDir.file("tmp/scala/classfileBackup/" + scalaTask.getName() + ".bak")
             );
             LOGGER.debug("Java annotationProcessorPath {}", javaTask.getOptions().getAnnotationProcessorPath());
             LOGGER.debug("Scala compiler args {}", scalaTask.getOptions().getCompilerArgs());
         });
-        LOGGER.debug("Scala classpath: {}", scalaTask.getClasspath());
 
         javaTask.dependsOn(scalaTask);
+
+        // Prevent error from implicit dependency (AGP 8.0 or above)
+        // https://docs.gradle.org/8.1.1/userguide/validation_problems.html#implicit_dependency
         String capitalizedName = variantName.substring(0,1).toUpperCase() + variantName.substring(1);
-        scalaTask.dependsOn(tasks.findByName("generate" + capitalizedName + "BuildConfig"));
+        dependsOnIfPresent(tasks, "process" + capitalizedName + "JavaRes", scalaTask);
     }
 
 }
