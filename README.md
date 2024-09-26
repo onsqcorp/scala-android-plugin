@@ -4,10 +4,14 @@ Tested on [a popular Android App](https://play.google.com/store/apps/details?id=
 
 ## Supported versions
 
-* Scala 2.13.7 or above
+* Scala 2.13.7 or later
 * Scala 2.11.12
-* Gradle 8.2.x or above
-* Android Plugin 8.2.x or above
+* Gradle 8.2.x or later
+* Android Plugin 8.2.x or later
+
+## Example project
+
+https://github.com/onsqcorp/hello-scala-android
 
 ## Installation
 
@@ -36,16 +40,12 @@ dependencies {
 }
 ```
 
-## Example project
-
-https://github.com/onsqcorp/hello-scala-android
-
 ## Build from the source and apply it to your project
 
  * Clone this repository
  * Run `publishToMavenLocal` gradle command
  * In the console, the artifact name `com.soundcorset:scala-android-plugin:yy.MMdd.HHmm` will be displayed (version changed for each time).
- * Set it in your project's `build.gradle.kts`. 
+ * Set it in your project's `build.gradle.kts`:
 ```kotlin
 buildscript {
     repositories {

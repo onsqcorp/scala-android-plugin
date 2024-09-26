@@ -10,7 +10,9 @@ import com.android.build.gradle.options.ProjectOptionService;
 import com.android.build.gradle.options.ProjectOptions;
 import com.android.build.gradle.options.StringOption;
 import org.gradle.api.*;
+import org.gradle.api.artifacts.ConfigurationContainer;
 import org.gradle.api.file.ConfigurableFileCollection;
+import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.PluginContainer;
 import org.gradle.api.plugins.jvm.internal.JvmPluginServices;
@@ -124,10 +126,12 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
             return;
         }
         TaskContainer tasks = project.getTasks();
+        ProjectLayout layout = project.getLayout();
+        ConfigurationContainer conf = project.getConfigurations();
         var javaClasspath = javaTask.getClasspath();
         var taskName = javaTask.getName().replace("Java", "Scala");
         var scalaTask = tasks.create(taskName, ScalaCompile.class);
-        var scalaOutDir = project.getLayout().getBuildDirectory().dir("tmp/scala-classes/" + variantName);
+        var scalaOutDir = layout.getBuildDirectory().dir("tmp/scala-classes/" + variantName);
         scalaTask.getDestinationDirectory().set(scalaOutDir);
         scalaTask.setScalaClasspath(scalaRuntime.inferScalaClasspath(javaClasspath));
         var preJavaClasspathKey = variant.registerPreJavacGeneratedBytecode(project.files(scalaOutDir));
@@ -138,8 +142,8 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
             scalaTask.dependsOn(t);
         }
         scalaTask.getScalaCompileOptions().getKeepAliveMode().set(KeepAliveMode.SESSION);
-        var zinc = project.getConfigurations().getByName("zinc");
-        var plugins = project.getConfigurations().getByName(ScalaBasePlugin.SCALA_COMPILER_PLUGINS_CONFIGURATION_NAME);
+        var zinc = conf.getByName("zinc");
+        var plugins = conf.getByName(ScalaBasePlugin.SCALA_COMPILER_PLUGINS_CONFIGURATION_NAME);
         scalaTask.setScalaCompilerPlugins(plugins.getAsFileTree());
         scalaTask.setZincClasspath(zinc.getAsFileTree());
 
@@ -154,9 +158,13 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         scalaTask.setSource(additionalSrc);
         javaTask.setSource(project.getObjects().fileCollection()); // set empty source
 
+        var buildDir = layout.getBuildDirectory();
+        var annotationProcessorPath = javaTask.getOptions().getAnnotationProcessorPath();
         scalaTask.doFirst(task -> {
-            var buildDir = project.getLayout().getBuildDirectory();
-            scalaTask.getOptions().setAnnotationProcessorPath(javaTask.getOptions().getAnnotationProcessorPath());
+            // Consciously reference objects from outside this block. Referencing certain objects,
+            // such as project or javaTask, can disable the configuration cache, slowing down build times.
+            // https://docs.gradle.org/current/userguide/configuration_cache.html#config_cache:requirements
+            scalaTask.getOptions().setAnnotationProcessorPath(annotationProcessorPath);
             var incrementalOptions = scalaTask.getScalaCompileOptions().getIncrementalOptions();
             incrementalOptions.getAnalysisFile().set(
                 buildDir.file("tmp/scala/compilerAnalysis/" + scalaTask.getName() + ".analysis")
@@ -164,8 +172,6 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
             incrementalOptions.getClassfileBackupDir().set(
                 buildDir.file("tmp/scala/classfileBackup/" + scalaTask.getName() + ".bak")
             );
-            LOGGER.debug("Java annotationProcessorPath {}", javaTask.getOptions().getAnnotationProcessorPath());
-            LOGGER.debug("Scala compiler args {}", scalaTask.getOptions().getCompilerArgs());
         });
 
         javaTask.dependsOn(scalaTask);

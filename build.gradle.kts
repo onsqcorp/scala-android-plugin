@@ -1,8 +1,6 @@
 import java.util.Date
 import java.text.SimpleDateFormat
 
-val androidVersion = "8.5.0"
-
 plugins {
     `java-gradle-plugin`
     groovy
@@ -27,7 +25,7 @@ version = ver
 println("groupId: $grp, version: $ver")
 
 dependencies {
-    compileOnly("com.android.tools.build:gradle:$androidVersion")
+    compileOnly("com.android.tools.build:gradle:8.6.0")
     compileOnly("org.jetbrains.kotlin.android:org.jetbrains.kotlin.android.gradle.plugin:2.0.0")
 }
 
@@ -54,7 +52,7 @@ publishing {
             pom {
                 name = "Scala android plugin"
                 description = "Scala android plugin"
-                url = "https://github.com/onsquare/scala-android-plugin"
+                url = "https://github.com/onsqcorp/scala-android-plugin"
                 licenses {
                     license {
                         name = "The Apache License, Version 2.0"
