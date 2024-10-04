@@ -113,6 +113,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
             BaseExtension androidExtension
     ) {
         String variantName = variant.getName();
+        String intermediatePath = "intermediates/scala/" + variantName;
         JavaCompile javaTask = variant.getJavaCompileProvider().getOrNull();
         if (javaTask == null) {
             LOGGER.warn("No java compile provider for {}", variantName);
@@ -123,7 +124,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         String taskName = javaTask.getName().replace("Java", "Scala");
         ScalaCompile scalaTask = tasks.create(taskName, ScalaCompile.class);
         var buildDir = project.getLayout().getBuildDirectory();
-        var scalaOutDir = buildDir.dir("tmp/scala-classes/" + variantName);
+        var scalaOutDir = buildDir.dir(intermediatePath + "/classes");
         scalaTask.getDestinationDirectory().set(scalaOutDir);
         ScalaRuntime scalaRuntime = project.getExtensions().getByType(ScalaRuntime.class);
         scalaTask.setScalaClasspath(scalaRuntime.inferScalaClasspath(javaClasspath));
@@ -152,9 +153,9 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         scalaTask.getOptions().setAnnotationProcessorPath(annotationProcessorPath);
         var incrementalOptions = scalaTask.getScalaCompileOptions().getIncrementalOptions();
         incrementalOptions.getAnalysisFile().set(
-                buildDir.file("tmp/scala/compilerAnalysis/" + taskName + ".analysis"));
+                buildDir.file(intermediatePath + "/incremental.analysis"));
         incrementalOptions.getClassfileBackupDir().set(
-                buildDir.file("tmp/scala/classfileBackup/" + taskName + ".bak"));
+                buildDir.file(intermediatePath + "/classfile.bak"));
 
         javaTask.dependsOn(scalaTask);
 
