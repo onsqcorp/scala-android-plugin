@@ -3,7 +3,6 @@ package com.soundcorset.scala.android.plugin;
 import com.android.build.gradle.*;
 import com.android.build.gradle.api.BaseVariant;
 import com.android.build.gradle.api.SourceKind;
-import com.android.build.gradle.internal.plugins.BasePlugin;
 import com.android.build.gradle.internal.services.BuildServicesKt;
 import com.android.build.gradle.options.BooleanOption;
 import com.android.build.gradle.options.ProjectOptionService;
@@ -12,7 +11,6 @@ import com.android.build.gradle.options.StringOption;
 import org.gradle.api.*;
 import org.gradle.api.artifacts.ConfigurationContainer;
 import org.gradle.api.file.ConfigurableFileCollection;
-import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.PluginContainer;
 import org.gradle.api.plugins.jvm.internal.JvmPluginServices;
@@ -20,6 +18,7 @@ import org.gradle.api.plugins.scala.ScalaBasePlugin;
 import org.gradle.api.services.BuildServiceRegistry;
 import org.gradle.api.tasks.ScalaRuntime;
 import org.gradle.api.tasks.TaskContainer;
+import org.gradle.api.tasks.compile.JavaCompile;
 import org.gradle.api.tasks.scala.ScalaCompile;
 import org.gradle.language.scala.tasks.KeepAliveMode;
 import org.slf4j.Logger;
@@ -40,20 +39,27 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
 
     public void apply(Project project) {
         super.apply(project);
-        ScalaRuntime scalaRuntime = project.getExtensions().getByType(ScalaRuntime.class);
         ensureAndroidPlugin(project.getPlugins());
+        checkJetifier(project);
         var androidExt = (BaseExtension) project.getExtensions().getByName("android");
+        addScalaSourceSet(project, androidExt);
+        project.afterEvaluate(proj -> {
+            listVariants(androidExt).forEach(variant -> processVariant(variant, proj, androidExt));
+        });
+    }
+
+    private static void addScalaSourceSet(Project project, BaseExtension androidExt) {
         // The function `all()` take account all the future additions for the source sets
         androidExt.getSourceSets().all(sourceSet -> {
             String sourceSetName = sourceSet.getName();
             File sourceSetPath = project.file("src/" + sourceSetName + "/scala");
             if (sourceSetPath.exists()) {
                 sourceSet.getJava().srcDir(sourceSetPath);
-            } else {
-                LOGGER.debug("SourceSet path does not exists for {} {}", sourceSet.getName(), sourceSetPath);
             }
         });
+    }
 
+    private static void checkJetifier(Project project) {
         BuildServiceRegistry sharedServices = project.getGradle().getSharedServices();
         ProjectOptionService optionService = BuildServicesKt.getBuildService(sharedServices, ProjectOptionService.class).get();
         ProjectOptions options = optionService.getProjectOptions();
@@ -62,33 +68,23 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         if(enableJetifier && (jetifierIgnoreList == null || !jetifierIgnoreList.contains("scala"))) {
             throw new GradleException("If jetifier is enabled, \"android.jetifier.ignorelist=scala\" should be defined in gradle.properties.");
         }
-
-        project.afterEvaluate(proj -> {
-            listVariants(androidExt).forEach(variant -> processVariant(variant, proj, scalaRuntime, androidExt));
-            TaskContainer tasks = proj.getTasks();
-            dependsOnIfPresent(tasks, "compileDebugUnitTestScalaWithScalac", "compileDebugScalaWithScalac");
-            dependsOnIfPresent(tasks, "compileReleaseUnitTestScalaWithScalac", "compileReleaseScalaWithScalac");
-        });
     }
 
-    private static void dependsOnIfPresent(TaskContainer tasks, String taskName1, String taskName2) {
-        dependsOnIfPresent(tasks, taskName1, tasks.findByPath(taskName2));
-    }
     private static void dependsOnIfPresent(TaskContainer tasks, String taskName, Task scalaTask) {
         Optional.ofNullable(tasks.findByName(taskName))
                 .map(t -> t.dependsOn(scalaTask));
     }
 
+    // Also available in org.jetbrains.kotlin.gradle.utils.androidPluginIds
     private static final List<String> ANDROID_PLUGIN_NAMES = Arrays.asList(
-        "com.android.internal.application", "com.android.internal.library", "com.android.internal.test"
+            "com.android.application", "com.android.library", "com.android.dynamic-feature", "com.android.test"
     );
 
     private static void ensureAndroidPlugin(PluginContainer plugins) {
         var plugin = ANDROID_PLUGIN_NAMES.stream()
             .map(plugins::findPlugin)
             .findFirst().orElse(null);
-
-        if (!(plugin instanceof BasePlugin)) {
+        if (plugin == null) {
             throw new GradleException("You must apply the Android plugin or the Android library plugin before using the scala-android plugin");
         }
     }
@@ -116,26 +112,28 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
     private static void processVariant(
             BaseVariant variant,
             Project project,
-            ScalaRuntime scalaRuntime,
             BaseExtension androidExtension
     ) {
-        var variantName = variant.getName();
-        var javaTask = variant.getJavaCompileProvider().getOrNull();
+        String variantName = variant.getName();
+        JavaCompile javaTask = variant.getJavaCompileProvider().getOrNull();
         if (javaTask == null) {
             LOGGER.warn("No java compile provider for {}", variantName);
             return;
         }
         TaskContainer tasks = project.getTasks();
-        ProjectLayout layout = project.getLayout();
         ConfigurationContainer conf = project.getConfigurations();
         var javaClasspath = javaTask.getClasspath();
-        var taskName = javaTask.getName().replace("Java", "Scala");
-        var scalaTask = tasks.create(taskName, ScalaCompile.class);
-        var scalaOutDir = layout.getBuildDirectory().dir("tmp/scala-classes/" + variantName);
+        String taskName = javaTask.getName().replace("Java", "Scala");
+        ScalaCompile scalaTask = tasks.create(taskName, ScalaCompile.class);
+        var buildDir = project.getLayout().getBuildDirectory();
+        var scalaOutDir = buildDir.dir("tmp/scala-classes/" + variantName);
         scalaTask.getDestinationDirectory().set(scalaOutDir);
+        ScalaRuntime scalaRuntime = project.getExtensions().getByType(ScalaRuntime.class);
         scalaTask.setScalaClasspath(scalaRuntime.inferScalaClasspath(javaClasspath));
         var preJavaClasspathKey = variant.registerPreJavacGeneratedBytecode(project.files(scalaOutDir));
-        var scalaClasspath = project.getObjects().fileCollection().from(javaClasspath).from(variant.getCompileClasspath(preJavaClasspathKey))
+        ConfigurableFileCollection scalaClasspath = project.getObjects().fileCollection()
+                .from(javaClasspath)
+                .from(variant.getCompileClasspath(preJavaClasspathKey))
                 .from(androidExtension.getBootClasspath().toArray());
         scalaTask.setClasspath(scalaClasspath);
         for(Object t: javaTask.getDependsOn()) {
@@ -158,21 +156,13 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         scalaTask.setSource(additionalSrc);
         javaTask.setSource(project.getObjects().fileCollection()); // set empty source
 
-        var buildDir = layout.getBuildDirectory();
         var annotationProcessorPath = javaTask.getOptions().getAnnotationProcessorPath();
-        scalaTask.doFirst(task -> {
-            // Consciously reference objects from outside this block. Referencing certain objects,
-            // such as project or javaTask, can disable the configuration cache, slowing down build times.
-            // https://docs.gradle.org/current/userguide/configuration_cache.html#config_cache:requirements
-            scalaTask.getOptions().setAnnotationProcessorPath(annotationProcessorPath);
-            var incrementalOptions = scalaTask.getScalaCompileOptions().getIncrementalOptions();
-            incrementalOptions.getAnalysisFile().set(
-                buildDir.file("tmp/scala/compilerAnalysis/" + scalaTask.getName() + ".analysis")
-            );
-            incrementalOptions.getClassfileBackupDir().set(
-                buildDir.file("tmp/scala/classfileBackup/" + scalaTask.getName() + ".bak")
-            );
-        });
+        scalaTask.getOptions().setAnnotationProcessorPath(annotationProcessorPath);
+        var incrementalOptions = scalaTask.getScalaCompileOptions().getIncrementalOptions();
+        incrementalOptions.getAnalysisFile().set(
+                buildDir.file("tmp/scala/compilerAnalysis/" + taskName + ".analysis"));
+        incrementalOptions.getClassfileBackupDir().set(
+                buildDir.file("tmp/scala/classfileBackup/" + taskName + ".bak"));
 
         javaTask.dependsOn(scalaTask);
 
