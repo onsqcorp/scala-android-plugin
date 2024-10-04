@@ -9,7 +9,6 @@ import com.android.build.gradle.options.ProjectOptionService;
 import com.android.build.gradle.options.ProjectOptions;
 import com.android.build.gradle.options.StringOption;
 import org.gradle.api.*;
-import org.gradle.api.artifacts.ConfigurationContainer;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.PluginContainer;
@@ -20,7 +19,6 @@ import org.gradle.api.tasks.ScalaRuntime;
 import org.gradle.api.tasks.TaskContainer;
 import org.gradle.api.tasks.compile.JavaCompile;
 import org.gradle.api.tasks.scala.ScalaCompile;
-import org.gradle.language.scala.tasks.KeepAliveMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,7 +119,6 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
             return;
         }
         TaskContainer tasks = project.getTasks();
-        ConfigurationContainer conf = project.getConfigurations();
         var javaClasspath = javaTask.getClasspath();
         String taskName = javaTask.getName().replace("Java", "Scala");
         ScalaCompile scalaTask = tasks.create(taskName, ScalaCompile.class);
@@ -139,11 +136,6 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         for(Object t: javaTask.getDependsOn()) {
             scalaTask.dependsOn(t);
         }
-        scalaTask.getScalaCompileOptions().getKeepAliveMode().set(KeepAliveMode.SESSION);
-        var zinc = conf.getByName("zinc");
-        var plugins = conf.getByName(ScalaBasePlugin.SCALA_COMPILER_PLUGINS_CONFIGURATION_NAME);
-        scalaTask.setScalaCompilerPlugins(plugins.getAsFileTree());
-        scalaTask.setZincClasspath(zinc.getAsFileTree());
 
         ConfigurableFileCollection additionalSrc = project.files(variant.getSourceFolders(SourceKind.JAVA));
         variant.getSourceSets().forEach(provider ->
