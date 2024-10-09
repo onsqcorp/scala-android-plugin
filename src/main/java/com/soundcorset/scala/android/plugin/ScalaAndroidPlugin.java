@@ -159,6 +159,11 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
 
         javaTask.dependsOn(scalaTask);
 
+        // Workaround to resolve the IntelliJ Scala IDE plugin not recognizing R.jar
+        // https://github.com/onsqcorp/scala-android-plugin/issues/2#issuecomment-2394861477
+        project.getDependencies().add(variantName + "CompileOnly",
+                project.fileTree(buildDir).include("**/" + variantName + "/**/R.jar"));
+
         // Prevent error from implicit dependency (AGP 8.0 or above)
         // https://docs.gradle.org/8.1.1/userguide/validation_problems.html#implicit_dependency
         String capitalizedName = variantName.substring(0,1).toUpperCase() + variantName.substring(1);
