@@ -4,10 +4,9 @@ Tested on [a popular Android App](https://play.google.com/store/apps/details?id=
 
 ## Supported versions
 
-* Scala 2.13.7 or later
-* Scala 2.11.12
+* Scala 2.11.12, Scala 2.13.7 or later
 * Gradle 8.2.x or later
-* Android Plugin 8.2.x or later
+* [Android Gradle Plugin](https://developer.android.com/build/releases/gradle-plugin) 8.2.x or later
 
 ## Example project
 
@@ -21,7 +20,7 @@ https://github.com/onsqcorp/hello-scala-android
 ```kotlin
 buildscript {
     dependencies {
-        classpath("com.soundcorset:scala-android-plugin:24.0606.2139")
+        classpath("com.soundcorset:scala-android-plugin:24.1019.1546")
         // ...
     }
 }
@@ -36,7 +35,7 @@ The plugin decides scala language version using scala-library's version.
 `build.gradle.kts`
 ```kotlin
 dependencies {
-    implementation("org.scala-lang:scala-library:2.13.13")
+    implementation("org.scala-lang:scala-library:2.13.14")
 }
 ```
 
