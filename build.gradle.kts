@@ -18,15 +18,15 @@ tasks.compileJava {
 }
 
 val grp = "com.soundcorset"
-val ver = SimpleDateFormat("yy.MMdd.HHmm").format(Date())
+val ver: String = SimpleDateFormat("yy.MMdd.HHmm").format(Date())
 group = grp
 version = ver
 
 println("groupId: $grp, version: $ver")
 
 dependencies {
-    compileOnly("com.android.tools.build:gradle:8.6.0")
-    compileOnly("org.jetbrains.kotlin.android:org.jetbrains.kotlin.android.gradle.plugin:2.0.0")
+    compileOnly("com.android.tools.build:gradle:8.9.0")
+    compileOnly("org.jetbrains.kotlin.android:org.jetbrains.kotlin.android.gradle.plugin:2.1.10")
 }
 
 gradlePlugin {

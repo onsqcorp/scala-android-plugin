@@ -35,7 +35,7 @@ The plugin decides scala language version using scala-library's version.
 `build.gradle.kts`
 ```kotlin
 dependencies {
-    implementation("org.scala-lang:scala-library:2.13.14")
+    implementation("org.scala-lang:scala-library:2.13.16")
 }
 ```
 

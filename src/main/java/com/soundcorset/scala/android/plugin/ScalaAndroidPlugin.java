@@ -9,6 +9,7 @@ import com.android.build.gradle.options.ProjectOptionService;
 import com.android.build.gradle.options.ProjectOptions;
 import com.android.build.gradle.options.StringOption;
 import org.gradle.api.*;
+import org.gradle.api.artifacts.dsl.DependencyFactory;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.PluginContainer;
@@ -31,8 +32,8 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
     private static final Logger LOGGER = LoggerFactory.getLogger(ScalaAndroidPlugin.class);
 
     @Inject
-    public ScalaAndroidPlugin(ObjectFactory objectFactory, JvmPluginServices jvmPluginServices) {
-        super(objectFactory, jvmPluginServices);
+    public ScalaAndroidPlugin(ObjectFactory objectFactory, JvmPluginServices jvmPluginServices, DependencyFactory dependencyFactory) {
+        super(objectFactory, jvmPluginServices, dependencyFactory);
     }
 
     public void apply(Project project) {
@@ -41,9 +42,9 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         checkJetifier(project);
         var androidExt = (BaseExtension) project.getExtensions().getByName("android");
         addScalaSourceSet(project, androidExt);
-        project.afterEvaluate(proj -> {
-            listVariants(androidExt).forEach(variant -> processVariant(variant, proj, androidExt));
-        });
+        project.afterEvaluate(proj ->
+            listVariants(androidExt).forEach(variant -> processVariant(variant, proj, androidExt))
+        );
     }
 
     private static void addScalaSourceSet(Project project, BaseExtension androidExt) {
