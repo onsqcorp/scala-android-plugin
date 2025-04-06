@@ -4,7 +4,7 @@ Tested on [a popular Android App](https://play.google.com/store/apps/details?id=
 
 ## Supported versions
 
-* Scala 2.11.12, Scala 2.13.7 or later
+* Scala 2.11.12, Scala 2.13.7 or later and Scala 3
 * Gradle 8.2.x or later
 * [Android Gradle Plugin](https://developer.android.com/build/releases/gradle-plugin) 8.2.x or later
 
