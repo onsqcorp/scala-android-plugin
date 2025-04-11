@@ -9,6 +9,7 @@ import com.android.build.gradle.options.ProjectOptionService;
 import com.android.build.gradle.options.ProjectOptions;
 import com.android.build.gradle.options.StringOption;
 import org.gradle.api.*;
+import org.gradle.api.artifacts.UnknownConfigurationException;
 import org.gradle.api.artifacts.dsl.DependencyFactory;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.model.ObjectFactory;
@@ -90,21 +91,21 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
 
     @SuppressWarnings("deprecation")
     private static Collection<? extends BaseVariant> listVariants(BaseExtension androidExtension) {
+        List<BaseVariant> variants = new ArrayList<>();
         if (androidExtension instanceof AppExtension) {
-            return ((AppExtension) androidExtension).getApplicationVariants();
+            variants.addAll(((AppExtension) androidExtension).getApplicationVariants());
         }
         if (androidExtension instanceof LibraryExtension) {
-            return ((LibraryExtension) androidExtension).getLibraryVariants();
+            variants.addAll(((LibraryExtension) androidExtension).getLibraryVariants());
         }
         if (androidExtension instanceof TestExtension) {
-            return ((TestExtension) androidExtension).getApplicationVariants();
+            variants.addAll(((TestExtension) androidExtension).getApplicationVariants());
         }
         if (androidExtension instanceof TestedExtension) {
-            List<BaseVariant> variants = new ArrayList<>(((TestedExtension) androidExtension).getTestVariants());
+            variants.addAll(((TestedExtension) androidExtension).getTestVariants());
             variants.addAll(((TestedExtension) androidExtension).getUnitTestVariants());
-            return variants;
         }
-        throw new RuntimeException("There is no android extension");
+        return variants;
     }
 
     @SuppressWarnings("deprecation")
@@ -162,9 +163,11 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
 
         // Workaround to resolve the IntelliJ Scala IDE plugin not recognizing R.jar
         // https://github.com/onsqcorp/scala-android-plugin/issues/2#issuecomment-2394861477
-        project.getDependencies().add(variantName + "CompileOnly",
-                project.fileTree(buildDir).include("**/" + variantName + "/**/R.jar"));
-
+        String compileOnlyConfigName = variantName + "CompileOnly";
+        if(project.getConfigurations().getNames().contains(compileOnlyConfigName)) {
+            project.getDependencies().add(compileOnlyConfigName,
+                    project.fileTree(buildDir).include("**/" + variantName + "/**/R.jar"));
+        }
         // Prevent error from implicit dependency (AGP 8.0 or above)
         // https://docs.gradle.org/8.1.1/userguide/validation_problems.html#implicit_dependency
         String capitalizedName = variantName.substring(0,1).toUpperCase() + variantName.substring(1);
