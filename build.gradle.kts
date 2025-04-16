@@ -31,8 +31,8 @@ dependencies {
 
 gradlePlugin {
     plugins {
-        create("scalaAndroidPlugin") {
-            id = "com.soundcorset.scala-android"
+        create("scala-android-plugin") {
+            id = "com.soundcorset.scala-android-plugin"
             implementationClass = "com.soundcorset.scala.android.plugin.ScalaAndroidPlugin"
         }
     }
