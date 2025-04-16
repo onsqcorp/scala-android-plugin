@@ -9,17 +9,20 @@ import com.android.build.gradle.options.ProjectOptionService;
 import com.android.build.gradle.options.ProjectOptions;
 import com.android.build.gradle.options.StringOption;
 import org.gradle.api.*;
+import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.artifacts.dsl.DependencyFactory;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.PluginContainer;
 import org.gradle.api.plugins.jvm.internal.JvmPluginServices;
 import org.gradle.api.plugins.scala.ScalaBasePlugin;
+import org.gradle.api.plugins.scala.ScalaPluginExtension;
+import org.gradle.api.provider.Provider;
 import org.gradle.api.services.BuildServiceRegistry;
-import org.gradle.api.tasks.ScalaRuntime;
 import org.gradle.api.tasks.TaskContainer;
 import org.gradle.api.tasks.compile.JavaCompile;
 import org.gradle.api.tasks.scala.ScalaCompile;
+import org.gradle.api.tasks.scala.internal.ScalaRuntimeHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,10 +33,12 @@ import java.util.*;
 
 public class ScalaAndroidPlugin extends ScalaBasePlugin {
     private static final Logger LOGGER = LoggerFactory.getLogger(ScalaAndroidPlugin.class);
+    private final DependencyFactory dependencyFactory;
 
     @Inject
     public ScalaAndroidPlugin(ObjectFactory objectFactory, JvmPluginServices jvmPluginServices, DependencyFactory dependencyFactory) {
         super(objectFactory, jvmPluginServices, dependencyFactory);
+        this.dependencyFactory = dependencyFactory;
     }
 
     public void apply(Project project) {
@@ -41,13 +46,17 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         ensureAndroidPlugin(project.getPlugins());
         checkJetifier(project);
         var androidExt = (BaseExtension) project.getExtensions().getByName("android");
-        addScalaSourceSet(project, androidExt);
-        project.afterEvaluate(proj ->
-            listVariants(androidExt).forEach(variant -> processVariant(variant, proj, androidExt))
-        );
+        ScalaPluginExtension scalaPluginExtension = project.getExtensions().getByType(ScalaPluginExtension.class);
+        addScalaSourceSet(project, androidExt, scalaPluginExtension);
+        project.afterEvaluate(proj -> {
+            if(!scalaPluginExtension.getScalaVersion().isPresent()) {
+                throw new GradleException("scala.scalaVersion needs to be specified.");
+            }
+            listVariants(androidExt).forEach(variant -> processVariant(variant, proj, androidExt));
+        });
     }
 
-    private static void addScalaSourceSet(Project project, BaseExtension androidExt) {
+    private void addScalaSourceSet(Project project, BaseExtension androidExt, ScalaPluginExtension scalaPluginExtension) {
         // The function `all()` take account all the future additions for the source sets
         androidExt.getSourceSets().all(sourceSet -> {
             String sourceSetName = sourceSet.getName();
@@ -55,6 +64,8 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
             if (sourceSetPath.exists()) {
                 sourceSet.getJava().srcDir(sourceSetPath);
             }
+            // came from ScalaBasePlugin.configureSourceSetDefaults()
+            project.getConfigurations().getByName(sourceSet.getImplementationConfigurationName()).getDependencies().addLater(createScalaDependency_copy(scalaPluginExtension));
         });
     }
 
@@ -127,8 +138,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         var buildDir = project.getLayout().getBuildDirectory();
         var scalaOutDir = buildDir.dir(intermediatePath + "/classes");
         scalaTask.getDestinationDirectory().set(scalaOutDir);
-        ScalaRuntime scalaRuntime = project.getExtensions().getByType(ScalaRuntime.class);
-        scalaTask.setScalaClasspath(scalaRuntime.inferScalaClasspath(javaClasspath));
+        scalaTask.setScalaClasspath(project.getConfigurations().getByName("scalaToolchainRuntimeClasspath"));
         var preJavaClasspathKey = variant.registerPreJavacGeneratedBytecode(project.files(scalaOutDir));
         ConfigurableFileCollection scalaClasspath = project.getObjects().fileCollection()
                 .from(javaClasspath)
@@ -173,4 +183,14 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         dependsOnIfPresent(tasks, "process" + capitalizedName + "JavaRes", scalaTask);
     }
 
+    // Would be better if ScalaBasePlugin.createScalaDependency() is protected
+    protected Provider<Dependency> createScalaDependency_copy(ScalaPluginExtension scalaPluginExtension) {
+        return scalaPluginExtension.getScalaVersion().map(scalaVersion -> {
+            if (ScalaRuntimeHelper.isScala3(scalaVersion)) {
+                return dependencyFactory.create("org.scala-lang", "scala3-library_3", scalaVersion);
+            } else {
+                return dependencyFactory.create("org.scala-lang", "scala-library", scalaVersion);
+            }
+        });
+    }
 }

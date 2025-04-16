@@ -25,8 +25,8 @@ version = ver
 println("groupId: $grp, version: $ver")
 
 dependencies {
-    compileOnly("com.android.tools.build:gradle:8.9.0")
-    compileOnly("org.jetbrains.kotlin.android:org.jetbrains.kotlin.android.gradle.plugin:2.1.10")
+    compileOnly("com.android.tools.build:gradle:8.9.1")
+    compileOnly("org.jetbrains.kotlin.android:org.jetbrains.kotlin.android.gradle.plugin:2.1.20")
 }
 
 gradlePlugin {
@@ -50,8 +50,8 @@ publishing {
             version = ver
             from(components["java"])
             pom {
-                name = "Scala android plugin"
-                description = "Scala android plugin"
+                name = "Scala Android Plugin"
+                description = "Scala language support for Android"
                 url = "https://github.com/onsqcorp/scala-android-plugin"
                 licenses {
                     license {
