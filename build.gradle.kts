@@ -31,8 +31,8 @@ dependencies {
 
 gradlePlugin {
     plugins {
-        create("scala-android-plugin") {
-            id = "com.soundcorset.scala-android-plugin"
+        create("scala-android") {
+            id = "com.soundcorset.scala-android"
             implementationClass = "com.soundcorset.scala.android.plugin.ScalaAndroidPlugin"
         }
     }
@@ -45,7 +45,7 @@ tasks.withType<JavaCompile> {
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
-            artifactId = "scala-android-plugin"
+            artifactId = "scala-android"
             groupId = grp
             version = ver
             from(components["java"])
