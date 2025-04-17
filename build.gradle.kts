@@ -44,11 +44,10 @@ tasks.withType<JavaCompile> {
 
 publishing {
     publications {
-        create<MavenPublication>("mavenJava") {
+        configureEach { this as MavenPublication
             artifactId = "scala-android"
             groupId = grp
             version = ver
-            from(components["java"])
             pom {
                 name = "Scala Android Plugin"
                 description = "Scala language support for Android"

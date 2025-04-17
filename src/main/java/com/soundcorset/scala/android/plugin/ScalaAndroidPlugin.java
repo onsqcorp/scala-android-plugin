@@ -45,18 +45,17 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         super.apply(project);
         ensureAndroidPlugin(project.getPlugins());
         checkJetifier(project);
-        var androidExt = (BaseExtension) project.getExtensions().getByName("android");
-        ScalaPluginExtension scalaPluginExtension = project.getExtensions().getByType(ScalaPluginExtension.class);
-        addScalaSourceSet(project, androidExt, scalaPluginExtension);
+        var extensions = project.getExtensions();
+        var androidExt = (BaseExtension) extensions.getByName("android");
+        var scalaPluginExt = extensions.getByType(ScalaPluginExtension.class);
+        configureScalaSourceSet(project, androidExt, scalaPluginExt);
         project.afterEvaluate(proj -> {
-            if(!scalaPluginExtension.getScalaVersion().isPresent()) {
-                throw new GradleException("scala.scalaVersion needs to be specified.");
-            }
+            ensureScalaVersionSpecified(scalaPluginExt);
             listVariants(androidExt).forEach(variant -> processVariant(variant, proj, androidExt));
         });
     }
 
-    private void addScalaSourceSet(Project project, BaseExtension androidExt, ScalaPluginExtension scalaPluginExtension) {
+    public void configureScalaSourceSet(Project project, BaseExtension androidExt, ScalaPluginExtension scalaPluginExt) {
         // The function `all()` take account all the future additions for the source sets
         androidExt.getSourceSets().all(sourceSet -> {
             String sourceSetName = sourceSet.getName();
@@ -65,11 +64,17 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
                 sourceSet.getJava().srcDir(sourceSetPath);
             }
             // came from ScalaBasePlugin.configureSourceSetDefaults()
-            project.getConfigurations().getByName(sourceSet.getImplementationConfigurationName()).getDependencies().addLater(createScalaDependency_copy(scalaPluginExtension));
+            project.getConfigurations().getByName(sourceSet.getImplementationConfigurationName()).getDependencies().addLater(createScalaDependency_copy(scalaPluginExt));
         });
     }
 
-    private static void checkJetifier(Project project) {
+    public static void ensureScalaVersionSpecified(ScalaPluginExtension scalaPluginExt) {
+        if(!scalaPluginExt.getScalaVersion().isPresent()) {
+            throw new GradleException("scala.scalaVersion needs to be specified.");
+        }
+    }
+
+    public static void checkJetifier(Project project) {
         BuildServiceRegistry sharedServices = project.getGradle().getSharedServices();
         ProjectOptionService optionService = BuildServicesKt.getBuildService(sharedServices, ProjectOptionService.class).get();
         ProjectOptions options = optionService.getProjectOptions();
@@ -80,17 +85,17 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         }
     }
 
-    private static void dependsOnIfPresent(TaskContainer tasks, String taskName, Task scalaTask) {
+    public static void dependsOnIfPresent(TaskContainer tasks, String taskName, Task scalaTask) {
         Optional.ofNullable(tasks.findByName(taskName))
                 .map(t -> t.dependsOn(scalaTask));
     }
 
     // Also available in org.jetbrains.kotlin.gradle.utils.androidPluginIds
-    private static final List<String> ANDROID_PLUGIN_NAMES = Arrays.asList(
+    public static final List<String> ANDROID_PLUGIN_NAMES = Arrays.asList(
             "com.android.application", "com.android.library", "com.android.dynamic-feature", "com.android.test"
     );
 
-    private static void ensureAndroidPlugin(PluginContainer plugins) {
+    public static void ensureAndroidPlugin(PluginContainer plugins) {
         var plugin = ANDROID_PLUGIN_NAMES.stream()
             .map(plugins::findPlugin)
             .findFirst().orElse(null);
@@ -100,8 +105,8 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
     }
 
     @SuppressWarnings("deprecation")
-    private static Collection<? extends BaseVariant> listVariants(BaseExtension androidExtension) {
-        List<BaseVariant> variants = new ArrayList<>();
+    public static Collection<BaseVariant> listVariants(BaseExtension androidExtension) {
+        Collection<BaseVariant> variants = new ArrayList<>();
         if (androidExtension instanceof AppExtension) {
             variants.addAll(((AppExtension) androidExtension).getApplicationVariants());
         }
@@ -119,7 +124,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
     }
 
     @SuppressWarnings("deprecation")
-    private static void processVariant(
+    public static void processVariant(
             BaseVariant variant,
             Project project,
             BaseExtension androidExtension
@@ -184,7 +189,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
     }
 
     // Would be better if ScalaBasePlugin.createScalaDependency() is protected
-    protected Provider<Dependency> createScalaDependency_copy(ScalaPluginExtension scalaPluginExtension) {
+    public Provider<Dependency> createScalaDependency_copy(ScalaPluginExtension scalaPluginExtension) {
         return scalaPluginExtension.getScalaVersion().map(scalaVersion -> {
             if (ScalaRuntimeHelper.isScala3(scalaVersion)) {
                 return dependencyFactory.create("org.scala-lang", "scala3-library_3", scalaVersion);
