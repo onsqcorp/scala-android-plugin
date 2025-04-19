@@ -43,33 +43,31 @@ tasks.withType<JavaCompile> {
 }
 
 publishing {
-    publications {
-        configureEach { this as MavenPublication
-            artifactId = "scala-android"
-            groupId = grp
-            version = ver
-            pom {
-                name = "Scala Android Plugin"
-                description = "Scala language support for Android"
+    publications.configureEach { this as MavenPublication
+        artifactId = "scala-android"
+        groupId = grp
+        version = ver
+        pom {
+            name = "Scala Android Plugin"
+            description = "Scala language support for Android"
+            url = "https://github.com/onsqcorp/scala-android-plugin"
+            licenses {
+                license {
+                    name = "The Apache License, Version 2.0"
+                    url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+                }
+            }
+            developers {
+                developer {
+                    id = "onsqcorp"
+                    name = "Onsquare Developer"
+                    email = "onsqcorp@gmail.com"
+                }
+            }
+            scm {
+                connection = "https://github.com/onsqcorp/scala-android-plugin"
+                developerConnection = "https://github.com/onsqcorp/scala-android-plugin"
                 url = "https://github.com/onsqcorp/scala-android-plugin"
-                licenses {
-                    license {
-                        name = "The Apache License, Version 2.0"
-                        url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
-                    }
-                }
-                developers {
-                    developer {
-                        id = "onsqcorp"
-                        name = "Onsquare Developer"
-                        email = "onsqcorp@gmail.com"
-                    }
-                }
-                scm {
-                    connection = "https://github.com/onsqcorp/scala-android-plugin"
-                    developerConnection = "https://github.com/onsqcorp/scala-android-plugin"
-                    url = "https://github.com/onsqcorp/scala-android-plugin"
-                }
             }
         }
     }

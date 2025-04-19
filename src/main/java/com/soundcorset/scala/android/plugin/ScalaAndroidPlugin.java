@@ -138,12 +138,13 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         }
         TaskContainer tasks = project.getTasks();
         var javaClasspath = javaTask.getClasspath();
-        String taskName = javaTask.getName().replace("Java", "Scala");
-        ScalaCompile scalaTask = tasks.create(taskName, ScalaCompile.class);
+        String scalaTaskName = javaTask.getName().replace("Java", "Scala");
+        ScalaCompile scalaTask = tasks.create(scalaTaskName, ScalaCompile.class);
         var buildDir = project.getLayout().getBuildDirectory();
         var scalaOutDir = buildDir.dir(intermediatePath + "/classes");
+        var configurations = project.getConfigurations();
         scalaTask.getDestinationDirectory().set(scalaOutDir);
-        scalaTask.setScalaClasspath(project.getConfigurations().getByName("scalaToolchainRuntimeClasspath"));
+        scalaTask.setScalaClasspath(configurations.getByName("scalaToolchainRuntimeClasspath"));
         var preJavaClasspathKey = variant.registerPreJavacGeneratedBytecode(project.files(scalaOutDir));
         ConfigurableFileCollection scalaClasspath = project.getObjects().fileCollection()
                 .from(javaClasspath)
@@ -178,7 +179,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         // Workaround to resolve the IntelliJ Scala IDE plugin not recognizing R.jar
         // https://github.com/onsqcorp/scala-android-plugin/issues/2#issuecomment-2394861477
         String compileOnlyConfigName = variantName + "CompileOnly";
-        if(project.getConfigurations().getNames().contains(compileOnlyConfigName)) {
+        if(configurations.getNames().contains(compileOnlyConfigName)) {
             project.getDependencies().add(compileOnlyConfigName,
                     project.fileTree(buildDir).include("**/" + variantName + "/**/R.jar"));
         }
