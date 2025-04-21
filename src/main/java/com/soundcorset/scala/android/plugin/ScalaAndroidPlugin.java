@@ -70,7 +70,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
 
     public static void ensureScalaVersionSpecified(ScalaPluginExtension scalaPluginExt) {
         if(!scalaPluginExt.getScalaVersion().isPresent()) {
-            throw new GradleException("scala.scalaVersion needs to be specified.");
+            throw new GradleException("scala.scalaVersion property needs to be specified. See https://docs.gradle.org/8.13/userguide/scala_plugin.html#sec:scala_version");
         }
     }
 
@@ -85,21 +85,13 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         }
     }
 
-    public static void dependsOnIfPresent(TaskContainer tasks, String taskName, Task scalaTask) {
-        Optional.ofNullable(tasks.findByName(taskName))
-                .map(t -> t.dependsOn(scalaTask));
-    }
-
     // Also available in org.jetbrains.kotlin.gradle.utils.androidPluginIds
     public static final List<String> ANDROID_PLUGIN_NAMES = Arrays.asList(
             "com.android.application", "com.android.library", "com.android.dynamic-feature", "com.android.test"
     );
 
     public static void ensureAndroidPlugin(PluginContainer plugins) {
-        var plugin = ANDROID_PLUGIN_NAMES.stream()
-            .map(plugins::findPlugin)
-            .findFirst().orElse(null);
-        if (plugin == null) {
+        if (ANDROID_PLUGIN_NAMES.stream().noneMatch(plugins::hasPlugin)) {
             throw new GradleException("You must apply the Android plugin or the Android library plugin before using the scala-android plugin");
         }
     }
@@ -124,18 +116,10 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
     }
 
     @SuppressWarnings("deprecation")
-    public static void processVariant(
-            BaseVariant variant,
-            Project project,
-            BaseExtension androidExtension
-    ) {
+    public static void processVariant(BaseVariant variant, Project project, BaseExtension androidExtension) {
         String variantName = variant.getName();
         String intermediatePath = "intermediates/scala/" + variantName;
-        JavaCompile javaTask = variant.getJavaCompileProvider().getOrNull();
-        if (javaTask == null) {
-            LOGGER.warn("No java compile provider for {}", variantName);
-            return;
-        }
+        JavaCompile javaTask = variant.getJavaCompileProvider().get();
         TaskContainer tasks = project.getTasks();
         var javaClasspath = javaTask.getClasspath();
         String scalaTaskName = javaTask.getName().replace("Java", "Scala");
@@ -151,19 +135,13 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
                 .from(variant.getCompileClasspath(preJavaClasspathKey))
                 .from(androidExtension.getBootClasspath().toArray());
         scalaTask.setClasspath(scalaClasspath);
-        for(Object t: javaTask.getDependsOn()) {
-            scalaTask.dependsOn(t);
-        }
+        javaTask.getDependsOn().forEach(scalaTask::dependsOn);
 
-        ConfigurableFileCollection additionalSrc = project.files(variant.getSourceFolders(SourceKind.JAVA));
+        ConfigurableFileCollection scalaSrc = project.files(variant.getSourceFolders(SourceKind.JAVA));
         variant.getSourceSets().forEach(provider ->
-            provider.getJavaDirectories().forEach(dir -> {
-                if(dir.exists()) {
-                    additionalSrc.from(dir);
-                }
-            })
+            provider.getJavaDirectories().forEach(scalaSrc::from)
         );
-        scalaTask.setSource(additionalSrc);
+        scalaTask.setSource(scalaSrc);
         javaTask.setSource(project.getObjects().fileCollection()); // set empty source
 
         var annotationProcessorPath = javaTask.getOptions().getAnnotationProcessorPath();
@@ -179,14 +157,10 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         // Workaround to resolve the IntelliJ Scala IDE plugin not recognizing R.jar
         // https://github.com/onsqcorp/scala-android-plugin/issues/2#issuecomment-2394861477
         String compileOnlyConfigName = variantName + "CompileOnly";
-        if(configurations.getNames().contains(compileOnlyConfigName)) {
+        Optional.ofNullable(configurations.findByName(compileOnlyConfigName)).map( c ->
             project.getDependencies().add(compileOnlyConfigName,
-                    project.fileTree(buildDir).include("**/" + variantName + "/**/R.jar"));
-        }
-        // Prevent error from implicit dependency (AGP 8.0 or above)
-        // https://docs.gradle.org/8.1.1/userguide/validation_problems.html#implicit_dependency
-        String capitalizedName = variantName.substring(0,1).toUpperCase() + variantName.substring(1);
-        dependsOnIfPresent(tasks, "process" + capitalizedName + "JavaRes", scalaTask);
+                    project.fileTree(buildDir).include("**/" + variantName + "/**/R.jar"))
+        );
     }
 
     // Would be better if ScalaBasePlugin.createScalaDependency() is protected
