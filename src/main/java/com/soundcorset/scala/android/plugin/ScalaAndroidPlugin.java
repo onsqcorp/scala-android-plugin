@@ -3,12 +3,8 @@ package com.soundcorset.scala.android.plugin;
 import com.android.build.gradle.*;
 import com.android.build.gradle.api.BaseVariant;
 import com.android.build.gradle.api.SourceKind;
-import com.android.build.gradle.internal.services.BuildServicesKt;
-import com.android.build.gradle.options.BooleanOption;
-import com.android.build.gradle.options.ProjectOptionService;
-import com.android.build.gradle.options.ProjectOptions;
-import com.android.build.gradle.options.StringOption;
-import org.gradle.api.*;
+import org.gradle.api.GradleException;
+import org.gradle.api.Project;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.artifacts.dsl.DependencyFactory;
 import org.gradle.api.file.ConfigurableFileCollection;
@@ -18,7 +14,6 @@ import org.gradle.api.plugins.jvm.internal.JvmPluginServices;
 import org.gradle.api.plugins.scala.ScalaBasePlugin;
 import org.gradle.api.plugins.scala.ScalaPluginExtension;
 import org.gradle.api.provider.Provider;
-import org.gradle.api.services.BuildServiceRegistry;
 import org.gradle.api.tasks.TaskContainer;
 import org.gradle.api.tasks.compile.JavaCompile;
 import org.gradle.api.tasks.scala.ScalaCompile;
@@ -44,7 +39,6 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
     public void apply(Project project) {
         super.apply(project);
         ensureAndroidPlugin(project.getPlugins());
-        checkJetifier(project);
         var extensions = project.getExtensions();
         var androidExt = (BaseExtension) extensions.getByName("android");
         var scalaPluginExt = extensions.getByType(ScalaPluginExtension.class);
@@ -69,19 +63,8 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
     }
 
     public static void ensureScalaVersionSpecified(ScalaPluginExtension scalaPluginExt) {
-        if(!scalaPluginExt.getScalaVersion().isPresent()) {
+        if (!scalaPluginExt.getScalaVersion().isPresent()) {
             throw new GradleException("scala.scalaVersion property needs to be specified. See https://docs.gradle.org/8.13/userguide/scala_plugin.html#sec:scala_version");
-        }
-    }
-
-    public static void checkJetifier(Project project) {
-        BuildServiceRegistry sharedServices = project.getGradle().getSharedServices();
-        ProjectOptionService optionService = BuildServicesKt.getBuildService(sharedServices, ProjectOptionService.class).get();
-        ProjectOptions options = optionService.getProjectOptions();
-        String jetifierIgnoreList = options.get(StringOption.JETIFIER_IGNORE_LIST); // Alternatively, project.property("android.jetifier.ignorelist")
-        boolean enableJetifier = options.get(BooleanOption.ENABLE_JETIFIER); // Alternatively, project.property("android.enableJetifier")
-        if(enableJetifier && (jetifierIgnoreList == null || !jetifierIgnoreList.contains("scala"))) {
-            throw new GradleException("If jetifier is enabled, \"android.jetifier.ignorelist=scala\" should be defined in gradle.properties.");
         }
     }
 
