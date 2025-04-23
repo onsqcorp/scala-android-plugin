@@ -144,6 +144,10 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
             project.getDependencies().add(compileOnlyConfigName,
                     project.fileTree(buildDir).include("**/" + variantName + "/**/R.jar"))
         );
+        // Prevent error from implicit dependency (AGP 8.0 or later)
+        // https://docs.gradle.org/8.1.1/userguide/validation_problems.html#implicit_dependency
+        variant.getProcessJavaResourcesProvider().get().mustRunAfter(scalaTask);
+        // Strangely enough, 1) the error does not always happen without the code above. 2) scalaTask.mustRunAfter(variant.getProcessJavaResourcesProvider()) also mutes the error. Why?
     }
 
     // Would be better if ScalaBasePlugin.createScalaDependency() is protected
