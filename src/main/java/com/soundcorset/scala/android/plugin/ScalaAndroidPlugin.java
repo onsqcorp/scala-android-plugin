@@ -22,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
-import java.io.File;
 import java.util.*;
 
 
@@ -42,23 +41,19 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         var extensions = project.getExtensions();
         var androidExt = (BaseExtension) extensions.getByName("android");
         var scalaPluginExt = extensions.getByType(ScalaPluginExtension.class);
-        configureScalaSourceSet(project, androidExt, scalaPluginExt);
+        configureScalaSourceSet(dependencyFactory, project, androidExt, scalaPluginExt);
         project.afterEvaluate(proj -> {
             ensureScalaVersionSpecified(scalaPluginExt);
             listVariants(androidExt).forEach(variant -> processVariant(variant, proj, androidExt));
         });
     }
 
-    public void configureScalaSourceSet(Project project, BaseExtension androidExt, ScalaPluginExtension scalaPluginExt) {
+    public static void configureScalaSourceSet(DependencyFactory dependencyFactory, Project project, BaseExtension androidExt, ScalaPluginExtension scalaPluginExt) {
         // The function `all()` take account all the future additions for the source sets
         androidExt.getSourceSets().all(sourceSet -> {
-            String sourceSetName = sourceSet.getName();
-            File sourceSetPath = project.file("src/" + sourceSetName + "/scala");
-            if (sourceSetPath.exists()) {
-                sourceSet.getJava().srcDir(sourceSetPath);
-            }
-            // came from ScalaBasePlugin.configureSourceSetDefaults()
-            project.getConfigurations().getByName(sourceSet.getImplementationConfigurationName()).getDependencies().addLater(createScalaDependency_copy(scalaPluginExt));
+            sourceSet.getJava().srcDir(project.file("src/" + sourceSet.getName() + "/scala"));
+            project.getConfigurations().getByName(sourceSet.getImplementationConfigurationName()).getDependencies()
+                    .addLater(createScalaDependency(dependencyFactory, scalaPluginExt));
         });
     }
 
@@ -147,11 +142,12 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         // Prevent error from implicit dependency (AGP 8.0 or later)
         // https://docs.gradle.org/8.1.1/userguide/validation_problems.html#implicit_dependency
         variant.getProcessJavaResourcesProvider().get().mustRunAfter(scalaTask);
-        // Strangely enough, 1) the error does not always happen without the code above. 2) scalaTask.mustRunAfter(variant.getProcessJavaResourcesProvider()) also mutes the error. Why?
+        // Strangely enough, 1) the error does not always happen without the code above.
+        // 2) scalaTask.mustRunAfter(variant.getProcessJavaResourcesProvider()) also mutes the error. Why?
     }
 
-    // Would be better if ScalaBasePlugin.createScalaDependency() is protected
-    public Provider<Dependency> createScalaDependency_copy(ScalaPluginExtension scalaPluginExtension) {
+    // Would be better if ScalaBasePlugin.createScalaDependency() is public
+    public static Provider<Dependency> createScalaDependency(DependencyFactory dependencyFactory, ScalaPluginExtension scalaPluginExtension) {
         return scalaPluginExtension.getScalaVersion().map(scalaVersion -> {
             if (ScalaRuntimeHelper.isScala3(scalaVersion)) {
                 return dependencyFactory.create("org.scala-lang", "scala3-library_3", scalaVersion);
