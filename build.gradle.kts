@@ -25,8 +25,8 @@ version = ver
 println("groupId: $grp, version: $ver")
 
 dependencies {
-    compileOnly("com.android.tools.build:gradle:8.9.1")
-    compileOnly("org.jetbrains.kotlin.android:org.jetbrains.kotlin.android.gradle.plugin:2.1.20")
+    compileOnly("com.android.tools.build:gradle:8.13.1")
+    compileOnly("org.jetbrains.kotlin.android:org.jetbrains.kotlin.android.gradle.plugin:2.2.21")
 }
 
 gradlePlugin {

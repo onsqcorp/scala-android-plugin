@@ -4,7 +4,7 @@ Tested on [a popular Android App](https://play.google.com/store/apps/details?id=
 
 ## Supported versions
 
-* Scala 2.11.12, Scala 2.13.7 or later, Scala 3.3.3 or later
+* Scala 2.13.7 or later, Scala 3.3.3 or later
 * Gradle 8.13 or later
 * [Android Gradle Plugin](https://developer.android.com/build/releases/gradle-plugin) 8.4.x or later
 
@@ -20,7 +20,7 @@ plugins {
     id("com.soundcorset.scala-android") version "25.0417.2204"
     // ...
 }
-scala.scalaVersion = "3.7.0-RC2"
+scala.scalaVersion = "3.7.3"
 ```
 
 ## Build from the source and apply it to your project

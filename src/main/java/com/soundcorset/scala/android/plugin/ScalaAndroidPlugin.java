@@ -106,6 +106,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         var scalaOutDir = buildDir.dir(intermediatePath + "/classes");
         var configurations = project.getConfigurations();
         scalaTask.getDestinationDirectory().set(scalaOutDir);
+        // See https://docs.gradle.org/9.0.0/userguide/scala_plugin.html#sec:scala_version and ScalaBasePlugin.java for the details about "scalaToolchainRuntimeClasspath"
         scalaTask.setScalaClasspath(configurations.getByName("scalaToolchainRuntimeClasspath"));
         var preJavaClasspathKey = variant.registerPreJavacGeneratedBytecode(project.files(scalaOutDir));
         ConfigurableFileCollection scalaClasspath = project.getObjects().fileCollection()
