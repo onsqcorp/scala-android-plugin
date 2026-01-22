@@ -4,9 +4,10 @@ Tested on [a popular Android App](https://play.google.com/store/apps/details?id=
 
 ## Supported versions
 
-* Scala 2.13.7 or later, Scala 3.3.3 or later
+* [Scala 2.13.7](https://github.com/scala/scala/releases/tag/v2.13.7) or later, Scala 3.3.3 or later
 * Gradle 8.13 or later
 * [Android Gradle Plugin](https://developer.android.com/build/releases/gradle-plugin) 8.4.x or later
+* Android 8 (API 26) or later
 
 ## Example project
 

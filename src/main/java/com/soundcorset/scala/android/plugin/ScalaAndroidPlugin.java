@@ -1,5 +1,7 @@
 package com.soundcorset.scala.android.plugin;
 
+import com.android.build.api.dsl.CommonExtension;
+import com.android.build.api.variant.AndroidComponentsExtension;
 import com.android.build.gradle.*;
 import com.android.build.gradle.api.BaseVariant;
 import com.android.build.gradle.api.SourceKind;
@@ -39,19 +41,19 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         super.apply(project);
         ensureAndroidPlugin(project.getPlugins());
         var extensions = project.getExtensions();
-        var androidExt = (BaseExtension) extensions.getByName("android");
+        var androidExt = (CommonExtension) extensions.getByName("android");
         var scalaPluginExt = extensions.getByType(ScalaPluginExtension.class);
         configureScalaSourceSet(dependencyFactory, project, androidExt, scalaPluginExt);
         project.afterEvaluate(proj -> {
             ensureScalaVersionSpecified(scalaPluginExt);
-            listVariants(androidExt).forEach(variant -> processVariant(variant, proj, androidExt));
+            listVariants(androidExt).forEach(variant -> processVariant(variant, proj));
         });
     }
 
-    public static void configureScalaSourceSet(DependencyFactory dependencyFactory, Project project, BaseExtension androidExt, ScalaPluginExtension scalaPluginExt) {
+    public static void configureScalaSourceSet(DependencyFactory dependencyFactory, Project project, CommonExtension androidExt, ScalaPluginExtension scalaPluginExt) {
         // The function `all()` take account all the future additions for the source sets
         androidExt.getSourceSets().all(sourceSet -> {
-            sourceSet.getJava().srcDir(project.file("src/" + sourceSet.getName() + "/scala"));
+            sourceSet.getJava().getDirectories().add("src/" + sourceSet.getName() + "/scala");
             project.getConfigurations().getByName(sourceSet.getImplementationConfigurationName()).getDependencies()
                     .addLater(createScalaDependency(dependencyFactory, scalaPluginExt));
         });
@@ -75,7 +77,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
     }
 
     @SuppressWarnings("deprecation")
-    public static Collection<BaseVariant> listVariants(BaseExtension androidExtension) {
+    public static Collection<BaseVariant> listVariants(CommonExtension androidExtension) {
         Collection<BaseVariant> variants = new ArrayList<>();
         if (androidExtension instanceof AppExtension) {
             variants.addAll(((AppExtension) androidExtension).getApplicationVariants());
@@ -94,7 +96,7 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
     }
 
     @SuppressWarnings("deprecation")
-    public static void processVariant(BaseVariant variant, Project project, BaseExtension androidExtension) {
+    public static void processVariant(BaseVariant variant, Project project) {
         String variantName = variant.getName();
         String intermediatePath = "intermediates/scala/" + variantName;
         JavaCompile javaTask = variant.getJavaCompileProvider().get();
@@ -109,10 +111,11 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         // See https://docs.gradle.org/9.0.0/userguide/scala_plugin.html#sec:scala_version and ScalaBasePlugin.java for the details about "scalaToolchainRuntimeClasspath"
         scalaTask.setScalaClasspath(configurations.getByName("scalaToolchainRuntimeClasspath"));
         var preJavaClasspathKey = variant.registerPreJavacGeneratedBytecode(project.files(scalaOutDir));
+        var androidComponents = project.getExtensions().getByType(AndroidComponentsExtension.class);
         ConfigurableFileCollection scalaClasspath = project.getObjects().fileCollection()
                 .from(javaClasspath)
                 .from(variant.getCompileClasspath(preJavaClasspathKey))
-                .from(androidExtension.getBootClasspath().toArray());
+                .from(androidComponents.getSdkComponents().getBootClasspath());
         scalaTask.setClasspath(scalaClasspath);
         javaTask.getDependsOn().forEach(scalaTask::dependsOn);
 

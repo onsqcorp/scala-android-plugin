@@ -25,13 +25,13 @@ version = ver
 println("groupId: $grp, version: $ver")
 
 dependencies {
-    compileOnly("com.android.tools.build:gradle:8.13.1")
-    compileOnly("org.jetbrains.kotlin.android:org.jetbrains.kotlin.android.gradle.plugin:2.2.21")
+    compileOnly("com.android.tools.build:gradle:9.0.0")
+    compileOnly("org.jetbrains.kotlin.android:org.jetbrains.kotlin.android.gradle.plugin:2.3.0")
 }
 
 gradlePlugin {
     plugins {
-        create("scala-android") {
+        register("scala-android") {
             id = "com.soundcorset.scala-android"
             implementationClass = "com.soundcorset.scala.android.plugin.ScalaAndroidPlugin"
         }
