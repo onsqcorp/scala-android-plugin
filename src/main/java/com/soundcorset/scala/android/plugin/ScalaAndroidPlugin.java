@@ -41,13 +41,13 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         super.apply(project);
         ensureAndroidPlugin(project.getPlugins());
         var extensions = project.getExtensions();
-        var androidExt = (CommonExtension) extensions.getByName("android");
+        CommonExtension androidExt = extensions.getByType(CommonExtension.class);
         var scalaPluginExt = extensions.getByType(ScalaPluginExtension.class);
         configureScalaSourceSet(dependencyFactory, project, androidExt, scalaPluginExt);
         var androidComponents = (AndroidComponentsExtension<?, ?, Variant>)extensions.getByType(AndroidComponentsExtension.class);
         androidComponents.onVariants(androidComponents.selector().all(), variant -> {
             ensureScalaVersionSpecified(scalaPluginExt);
-            processVariant(project, variant, androidComponents);
+            processVariant(project, variant);
         });
     }
 
@@ -77,47 +77,42 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         }
     }
 
-    public static void processVariant(Project project, Variant variant, AndroidComponentsExtension<?, ?, Variant> androidComponents) {
+    public static void processVariant(Project project, Variant variant) {
         String variantName = variant.getName();
-        String javaTaskName = "compile" + capitalize(variantName) + "JavaWithJavac";
-        String scalaTaskName = "compile" + capitalize(variantName) + "Scala";
+        String VName = capitalize(variantName);
         String intermediatePath = "intermediates/scala/" + variantName;
         var buildDir = project.getLayout().getBuildDirectory();
         var configurations = project.getConfigurations();
-        TaskProvider<ScalaCompile> scalaTaskProvider = project.getTasks().register(scalaTaskName, ScalaCompile.class);
-
+        var androidComponents = project.getExtensions().getByType(AndroidComponentsExtension.class);
+        TaskProvider<ScalaCompile> scalaTaskProvider = project.getTasks().register("compile" + VName + "Scala", ScalaCompile.class);
+        scalaTaskProvider.configure(scalaTask -> {
+            scalaTask.getDestinationDirectory().set(buildDir.dir(intermediatePath + "/classes"));
+            // See https://docs.gradle.org/9.0.0/userguide/scala_plugin.html#sec:scala_version and ScalaBasePlugin.java for the details about "scalaToolchainRuntimeClasspath"
+            scalaTask.setScalaClasspath(configurations.getByName("scalaToolchainRuntimeClasspath"));
+            var incrementalOptions = scalaTask.getScalaCompileOptions().getIncrementalOptions();
+            incrementalOptions.getAnalysisFile().set(buildDir.file(intermediatePath + "/incremental.analysis"));
+            incrementalOptions.getClassfileBackupDir().set(buildDir.file(intermediatePath + "/classfile.bak"));
+        });
         variant.getArtifacts().forScope(ScopedArtifacts.Scope.PROJECT).use(scalaTaskProvider)
                 .toAppend(ScopedArtifact.CLASSES.INSTANCE, ScalaCompile::getDestinationDirectory);
 
         project.afterEvaluate(p -> {
-            var javaTask = (JavaCompile) p.getTasks().findByName(javaTaskName);
-
+            var javaTask = (JavaCompile) project.getTasks().findByName("compile" + VName + "JavaWithJavac");
             scalaTaskProvider.configure(scalaTask -> {
-                scalaTask.setDescription("Compiles Scala sources for variant " + variantName);
-                var scalaOutDir = buildDir.dir(intermediatePath + "/classes");
-                scalaTask.getDestinationDirectory().set(scalaOutDir);
-                // See https://docs.gradle.org/9.0.0/userguide/scala_plugin.html#sec:scala_version and ScalaBasePlugin.java for the details about "scalaToolchainRuntimeClasspath"
-                scalaTask.setScalaClasspath(configurations.getByName("scalaToolchainRuntimeClasspath"));
-                Task processResTask = project.getTasks().findByName("process" + capitalize(variantName) + "Resources");
+                Task processResTask = project.getTasks().findByName("process" + VName + "Resources");
                 // This effectively disables the compile-time R class, mirroring the behavior of android.enableAppCompileTimeRClass=false in gradle.properties.
                 FileCollection rJar = processResTask.getOutputs().getFiles().filter(f -> f.getName().equals("R.jar"));
                 scalaTask.setClasspath(rJar
                         .plus(javaTask.getClasspath())
                         .plus(variant.getCompileClasspath())
-                        .plus(p.files(androidComponents.getSdkComponents().getBootClasspath())));
+                        .plus(project.files(androidComponents.getSdkComponents().getBootClasspath())));
                 javaTask.getDependsOn().forEach(scalaTask::dependsOn);
-                scalaTask.setSource(p.files(variant.getSources().getJava().getAll()));
+                scalaTask.setSource(project.files(variant.getSources().getJava().getAll()));
                 javaTask.setSource(project.getObjects().fileCollection()); // set empty source
-
                 var annotationProcessorPath = javaTask.getOptions().getAnnotationProcessorPath();
                 scalaTask.getOptions().setAnnotationProcessorPath(annotationProcessorPath);
-                var incrementalOptions = scalaTask.getScalaCompileOptions().getIncrementalOptions();
-                incrementalOptions.getAnalysisFile().set(buildDir.file(intermediatePath + "/incremental.analysis"));
-                incrementalOptions.getClassfileBackupDir().set(buildDir.file(intermediatePath + "/classfile.bak"));
-
                 javaTask.dependsOn(scalaTask);
             });
-
             // Workaround to resolve the IntelliJ Scala IDE plugin not recognizing R.jar
             // https://github.com/onsqcorp/scala-android-plugin/issues/2#issuecomment-2394861477
             String compileOnlyConfigName = variantName + "CompileOnly";
