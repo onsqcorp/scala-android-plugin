@@ -6,7 +6,7 @@ Tested on [a popular Android App](https://play.google.com/store/apps/details?id=
 
 * [Scala 2.13.7](https://github.com/scala/scala/releases/tag/v2.13.7) or later, Scala 3.3.3 or later
 * Gradle 8.13 or later
-* [Android Gradle Plugin](https://developer.android.com/build/releases/gradle-plugin) 8.4.x or later
+* [Android Gradle Plugin(AGP)](https://developer.android.com/build/releases/gradle-plugin) 8.4.x or later
 * Android 8 (API 26) or later
 
 ## Example project
@@ -18,11 +18,18 @@ https://github.com/onsqcorp/hello-scala-android
 In `build.gradle.kts`
 ```kotlin
 plugins {
-    id("com.soundcorset.scala-android") version "25.0417.2204"
+    id("com.soundcorset.scala-android") version "26.0124.2208"
     // ...
 }
 scala.scalaVersion = "3.7.3"
 ```
+
+### Version compatibility
+
+| AGP version     | scala-android version | 
+|-----------------|-----------------------|
+| 9.0.0 or later  | 26.0124.2208          |
+| 8.4.x to 8.13.x | 25.0417.2204          |
 
 ## Build from the source and apply it to your project
 

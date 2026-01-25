@@ -103,7 +103,6 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
                 // This effectively disables the compile-time R class, mirroring the behavior of android.enableAppCompileTimeRClass=false in gradle.properties.
                 FileCollection rJar = processResTask.getOutputs().getFiles().filter(f -> f.getName().equals("R.jar"));
                 scalaTask.setClasspath(rJar
-                        .plus(javaTask.getClasspath())
                         .plus(variant.getCompileClasspath())
                         .plus(project.files(androidComponents.getSdkComponents().getBootClasspath())));
                 javaTask.getDependsOn().forEach(scalaTask::dependsOn);
