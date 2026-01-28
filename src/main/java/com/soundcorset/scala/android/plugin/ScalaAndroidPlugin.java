@@ -1,6 +1,7 @@
 package com.soundcorset.scala.android.plugin;
 
 import com.android.build.api.artifact.ScopedArtifact;
+import com.android.build.api.dsl.ApplicationExtension;
 import com.android.build.api.dsl.CommonExtension;
 import com.android.build.api.variant.*;
 import com.android.build.gradle.*;
@@ -47,8 +48,24 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         var androidComponents = (AndroidComponentsExtension<?, ?, Variant>)extensions.getByType(AndroidComponentsExtension.class);
         androidComponents.onVariants(androidComponents.selector().all(), variant -> {
             ensureScalaVersionSpecified(scalaPluginExt);
+            ensureResourceShrinkingOptions(project, androidComponents, variant);
             processVariant(project, variant);
         });
+    }
+
+    /**
+     * This plugin cannot handle android.r8.optimizedResourceShrinking feature, that is enabled by default AGP >= 9.
+     * TODO: Need to properly handle the optimization.
+     */
+    public static void ensureResourceShrinkingOptions(Project project, AndroidComponentsExtension<?, ?, Variant> androidComponents, Variant variant) {
+        if (androidComponents.getPluginVersion().getMajor() >= 9) {
+            ApplicationExtension appExt = project.getExtensions().findByType(ApplicationExtension.class);
+            boolean isShrinkEnabled = appExt.getBuildTypes().stream().anyMatch(bt ->
+                    variant.getName().toUpperCase().endsWith(bt.getName().toUpperCase()) && bt.isShrinkResources());
+            if(isShrinkEnabled && !"false".equals(project.findProperty("android.r8.optimizedResourceShrinking"))) {
+                throw new GradleException("With AGP 9.0+ and isShrinkResources=true, you must set android.r8.optimizedResourceShrinking=false in gradle.properties as it is not supported yet.");
+            }
+        }
     }
 
     public static void configureScalaSourceSet(DependencyFactory dependencyFactory, Project project, CommonExtension androidExt, ScalaPluginExtension scalaPluginExt) {
