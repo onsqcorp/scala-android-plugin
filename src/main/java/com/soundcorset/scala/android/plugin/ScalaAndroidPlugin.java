@@ -81,7 +81,8 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         String intermediatePath = "intermediates/scala/" + variantName;
         var buildDir = project.getLayout().getBuildDirectory();
         var configurations = project.getConfigurations();
-        var androidComponents = project.getExtensions().getByType(AndroidComponentsExtension.class);
+        var extensions = project.getExtensions();
+        var androidComponents = extensions.getByType(AndroidComponentsExtension.class);
         TaskProvider<ScalaCompile> scalaTaskProvider = project.getTasks().register("compile" + VName + "Scala", ScalaCompile.class);
         scalaTaskProvider.configure(scalaTask -> {
             scalaTask.getDestinationDirectory().set(buildDir.dir(intermediatePath + "/classes"));
@@ -104,8 +105,11 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
 
         project.afterEvaluate(p -> {
             var javaTask = (JavaCompile) project.getTasks().findByName("compile" + VName + "JavaWithJavac");
+            var scalaPluginExt = extensions.getByType(ScalaPluginExtension.class);
             scalaTaskProvider.configure(scalaTask -> {
-                scalaTask.setClasspath(project.files(stripTaskProvider)
+                var rClasspath = scalaPluginExt.getScalaVersion().get().startsWith("2") ? project.files(stripTaskProvider) :
+                        project.getTasks().findByName("generate" + VName + "RFile").getOutputs().getFiles().filter(f -> f.getName().equals("R.jar"));
+                scalaTask.setClasspath(rClasspath
                         .plus(variant.getCompileClasspath().filter(f -> !f.getName().equals("R.jar")))
                         .plus(project.files(androidComponents.getSdkComponents().getBootClasspath())));
                 javaTask.getDependsOn().forEach(scalaTask::dependsOn);
