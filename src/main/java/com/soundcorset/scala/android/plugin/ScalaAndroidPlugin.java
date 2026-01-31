@@ -1,16 +1,13 @@
 package com.soundcorset.scala.android.plugin;
 
 import com.android.build.api.artifact.ScopedArtifact;
-import com.android.build.api.dsl.ApplicationExtension;
 import com.android.build.api.dsl.CommonExtension;
 import com.android.build.api.variant.*;
 import com.android.build.gradle.*;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
-import org.gradle.api.Task;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.artifacts.dsl.DependencyFactory;
-import org.gradle.api.file.FileCollection;
 import org.gradle.api.tasks.TaskProvider;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.PluginContainer;
@@ -48,24 +45,8 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         var androidComponents = (AndroidComponentsExtension<?, ?, Variant>)extensions.getByType(AndroidComponentsExtension.class);
         androidComponents.onVariants(androidComponents.selector().all(), variant -> {
             ensureScalaVersionSpecified(scalaPluginExt);
-            ensureResourceShrinkingOptions(project, androidComponents, variant);
             processVariant(project, variant);
         });
-    }
-
-    /**
-     * This plugin cannot handle android.r8.optimizedResourceShrinking feature, that is enabled by default AGP >= 9.
-     * TODO: Need to properly handle the optimization.
-     */
-    public static void ensureResourceShrinkingOptions(Project project, AndroidComponentsExtension<?, ?, Variant> androidComponents, Variant variant) {
-        if (androidComponents.getPluginVersion().getMajor() >= 9) {
-            ApplicationExtension appExt = project.getExtensions().findByType(ApplicationExtension.class);
-            boolean isShrinkEnabled = appExt.getBuildTypes().stream().anyMatch(bt ->
-                    variant.getName().toUpperCase().endsWith(bt.getName().toUpperCase()) && bt.isShrinkResources());
-            if(isShrinkEnabled && !"false".equals(project.findProperty("android.r8.optimizedResourceShrinking"))) {
-                throw new GradleException("With AGP 9.0+ and isShrinkResources=true, you must set android.r8.optimizedResourceShrinking=false in gradle.properties as it is not supported yet.");
-            }
-        }
     }
 
     public static void configureScalaSourceSet(DependencyFactory dependencyFactory, Project project, CommonExtension androidExt, ScalaPluginExtension scalaPluginExt) {
@@ -112,19 +93,27 @@ public class ScalaAndroidPlugin extends ScalaBasePlugin {
         });
         variant.getArtifacts().forScope(ScopedArtifacts.Scope.PROJECT).use(scalaTaskProvider)
                 .toAppend(ScopedArtifact.CLASSES.INSTANCE, ScalaCompile::getDestinationDirectory);
+        // Related issue: https://issuetracker.google.com/issues/479577764
+        var stripTaskProvider = project.getTasks().register("strip" + VName + "RJar", StripFinalModifierTask.class, task -> {
+            var processResProvider = project.getTasks().named("generate" + VName + "RFile");
+            task.getRJarCollection().from(
+                processResProvider.map(t -> t.getOutputs().getFiles().filter(f -> f.getName().equals("R.jar")))
+            );
+            task.getOutputJar().set(buildDir.file("intermediates/scala_r/" + variantName + "/safe_r.jar"));
+        });
 
         project.afterEvaluate(p -> {
             var javaTask = (JavaCompile) project.getTasks().findByName("compile" + VName + "JavaWithJavac");
             scalaTaskProvider.configure(scalaTask -> {
-                Task processResTask = project.getTasks().findByName("process" + VName + "Resources");
-                // This effectively disables the compile-time R class, mirroring the behavior of android.enableAppCompileTimeRClass=false in gradle.properties.
-                FileCollection rJar = processResTask.getOutputs().getFiles().filter(f -> f.getName().equals("R.jar"));
-                scalaTask.setClasspath(rJar
-                        .plus(variant.getCompileClasspath())
+                scalaTask.setClasspath(project.files(stripTaskProvider)
+                        .plus(variant.getCompileClasspath().filter(f -> !f.getName().equals("R.jar")))
                         .plus(project.files(androidComponents.getSdkComponents().getBootClasspath())));
                 javaTask.getDependsOn().forEach(scalaTask::dependsOn);
                 scalaTask.setSource(project.files(variant.getSources().getJava().getAll()));
                 javaTask.setSource(project.getObjects().fileCollection()); // set empty source
+                var processResProvider = project.getTasks().named("process" + VName + "Resources");
+                // As the javaTask.source is empty, it looses dependency to process...Resources, so we compensate it. There is no performance impact because the scalaTask is the bottleneck.
+                javaTask.mustRunAfter(processResProvider);
                 var annotationProcessorPath = javaTask.getOptions().getAnnotationProcessorPath();
                 scalaTask.getOptions().setAnnotationProcessorPath(annotationProcessorPath);
                 javaTask.dependsOn(scalaTask);
